@@ -1,6 +1,7 @@
 package com.example.online.banking.model;
 
 import com.example.online.banking.ENum.EmployeeStatus;
+import com.example.online.banking.ENum.Role;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -47,6 +48,23 @@ public class Employee {
 
     @Column(nullable = false)
     private String mobileNumber;
+    @Transient
+    public Role getRole() {
+
+        return user != null
+                ? user.getRole()
+                : null;
+    }
+
+
+    @Transient
+    public void setRole(Role role) {
+
+        if (user != null) {
+            user.setRole(role);
+        }
+    }
+
 
     public Long getEmployeeId() {
         return employeeId;
@@ -153,4 +171,6 @@ public class Employee {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+
 }

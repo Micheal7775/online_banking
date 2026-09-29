@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -170,7 +169,7 @@ public class CustomerService {
         customer.setUser(customerUser);
 
         customer.setCustomerNumber(
-                generateCustomerNumber()
+                generateUniqueUsername()
         );
 
         customer.setFullName(
@@ -293,13 +292,19 @@ public class CustomerService {
         return "CUS" + mobileNumber;
     }
 
-    private String generateCustomerNumber() {
+    private String generateUniqueUsername() {
 
-        return "CUS-" +
-                UUID.randomUUID()
-                        .toString()
-                        .substring(0, 8)
-                        .toUpperCase();
+        String username;
+
+        do {
+            username =
+                    "CUS" +
+                            (1000000000L +
+                                    new java.util.Random().nextLong(900000000L));
+        }
+        while (userRepository.existsByUsername(username));
+
+        return username;
     }
 }
 

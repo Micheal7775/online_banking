@@ -3,6 +3,7 @@ package com.example.online.banking.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -14,16 +15,19 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    private static final String SECRET_KEY =
-            "my-online-banking-secret-key-must-be-long-enough-123456";
+    private final SecretKey key;
+    private final long expirationTime;
 
-    private static final long EXPIRATION_TIME =
-            1000 * 60 * 30; // 30 minutes
+    public JwtService(
+            @Value("${jwt.secret}") String secretKey,
+            @Value("${jwt.expiration}") long expirationTime) {
 
-    private final SecretKey key =
-            Keys.hmacShaKeyFor(
-                    SECRET_KEY.getBytes(StandardCharsets.UTF_8)
-            );
+        this.key = Keys.hmacShaKeyFor(
+                secretKey.getBytes(StandardCharsets.UTF_8)
+        );
+
+        this.expirationTime = expirationTime;
+    }
 
     public String generateToken(String username, String role) {
 
@@ -34,7 +38,7 @@ public class JwtService {
                 .expiration(
                         new Date(
                                 System.currentTimeMillis()
-                                        + EXPIRATION_TIME
+                                        + expirationTime
                         )
                 )
                 .signWith(key)

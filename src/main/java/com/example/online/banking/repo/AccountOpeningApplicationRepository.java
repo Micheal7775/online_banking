@@ -12,4 +12,9 @@ public interface AccountOpeningApplicationRepository
     List<AccountOpeningApplication> findByApplicationStatus(
             ApplicationStatus applicationStatus
     );
+
+    void deleteByCustomerCustomerId(Long customerId);
+
+
+
 }

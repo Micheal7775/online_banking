@@ -12,6 +12,7 @@ import com.example.online.banking.repo.AccountOpeningApplicationRepository;
 import com.example.online.banking.repo.EmployeeRepository;
 import com.example.online.banking.repo.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -187,4 +188,9 @@ public class ApplicationService {
 
         return applicationRepository.save(application);
     }
+
+    public List<AccountOpeningApplication> getAllApplications() {
+      return   applicationRepository.findAll();
+    }
+
 }

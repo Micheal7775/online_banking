@@ -686,4 +686,18 @@ public class AccountService {
                         .substring(0, 12)
                         .toUpperCase();
     }
+
+    public List< Account> getAllAccount() {
+      return   accountRepository.findAll();
+
+    }
+    public Account getAccountByAccountNumber(String accountNumber) {
+
+        return accountRepository
+                .findByAccountNumber(accountNumber)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Account not found"
+                        ));
+    }
 }

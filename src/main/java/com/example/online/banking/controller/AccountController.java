@@ -49,6 +49,7 @@ public class AccountController {
     }
 
 
+
     // =========================================
     // DEPOSIT
     // =========================================
@@ -69,7 +70,23 @@ public class AccountController {
                 .status(HttpStatus.CREATED)
                 .body(transaction);
     }
+    @GetMapping("/account")
+    public ResponseEntity<?> getAllAccount() {
+        return ResponseEntity.ok(
+                accountService.getAllAccount()
+        );
+    }
 
+    @GetMapping("/account/{accountNumber}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<Account> getAccountByNumber(
+            @PathVariable String accountNumber) {
+
+        Account account =
+                accountService.getAccountByAccountNumber(accountNumber);
+
+        return ResponseEntity.ok(account);
+    }
 
     // =========================================
     // WITHDRAW

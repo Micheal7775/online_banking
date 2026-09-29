@@ -72,7 +72,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(
                 List.of(
                         "http://localhost:5173",
-                        "https://onlinebanking-frontend.onrender.com"
+                       "http://13.126.207.99"
                 )
         );
 
