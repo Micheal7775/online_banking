@@ -3,8 +3,10 @@ package com.example.online.banking.controller;
 import com.example.online.banking.dto.*;
 import com.example.online.banking.exception.ResourceNotFoundException;
 import com.example.online.banking.model.Account;
+import com.example.online.banking.model.Customer;
 import com.example.online.banking.model.Transaction;
 import com.example.online.banking.model.User;
+import com.example.online.banking.repo.CustomerRepository;
 import com.example.online.banking.repo.UserRepository;
 import com.example.online.banking.service.AccountService;
 import com.example.online.banking.service.OtpService;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/manager/accounts")
@@ -27,7 +30,11 @@ import java.util.List;
 public class AccountController {
 
     private final AccountService accountService;
+
     private final UserRepository userRepository;
+
+    private final CustomerRepository customerRepository;
+
     private final OtpService otpService;
 
 
@@ -49,13 +56,87 @@ public class AccountController {
     }
 
 
+    // =========================================
+    // GET ALL ACCOUNTS
+    // =========================================
+
+    @GetMapping("/account")
+    public ResponseEntity<?> getAllAccount() {
+
+        return ResponseEntity.ok(
+                accountService.getAllAccount()
+        );
+    }
+
+
+    // =========================================
+    // GET ACCOUNT BY NUMBER - MANAGER
+    // =========================================
+
+    @GetMapping("/account/{accountNumber}")
+    @PreAuthorize("hasRole('BANK_MANAGER')")
+    public ResponseEntity<Account> getAccountByNumber(
+            @PathVariable String accountNumber) {
+
+        Account account =
+                accountService.getAccountByAccountNumber(
+                        accountNumber
+                );
+
+        return ResponseEntity.ok(account);
+    }
+
+
+    // =========================================
+    // GET MY ACCOUNT
+    // =========================================
+
+    @GetMapping("/my-account")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<Account> getMyAccount(
+            Authentication authentication) {
+
+        String username =
+                authentication.getName();
+
+        return ResponseEntity.ok(
+                accountService.getCustomerAccount(
+                        username
+                )
+        );
+    }
+
+
+    // =========================================
+    // GET CUSTOMER ACCOUNT
+    // =========================================
+
+    @GetMapping("/{accountNumber}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<Account> getAccount(
+            @PathVariable String accountNumber) {
+
+        Account account =
+                accountService.getAccountByNumber(
+                        accountNumber
+                );
+
+        return ResponseEntity.ok(account);
+    }
+
 
     // =========================================
     // DEPOSIT
     // =========================================
 
     @PostMapping("/{accountNumber}/deposit")
-    @PreAuthorize("hasAnyRole('BANK_MANAGER', 'ACCOUNT_OPENING_STAFF', 'CUSTOMER')")
+    @PreAuthorize(
+            "hasAnyRole(" +
+                    "'BANK_MANAGER', " +
+                    "'ACCOUNT_OPENING_STAFF', " +
+                    "'CUSTOMER'" +
+                    ")"
+    )
     public ResponseEntity<Transaction> deposit(
             @PathVariable String accountNumber,
             @Valid @RequestBody DepositRequest request) {
@@ -70,30 +151,19 @@ public class AccountController {
                 .status(HttpStatus.CREATED)
                 .body(transaction);
     }
-    @GetMapping("/account")
-    public ResponseEntity<?> getAllAccount() {
-        return ResponseEntity.ok(
-                accountService.getAllAccount()
-        );
-    }
 
-    @GetMapping("/account/{accountNumber}")
-    @PreAuthorize("hasRole('MANAGER')")
-    public ResponseEntity<Account> getAccountByNumber(
-            @PathVariable String accountNumber) {
-
-        Account account =
-                accountService.getAccountByAccountNumber(accountNumber);
-
-        return ResponseEntity.ok(account);
-    }
 
     // =========================================
     // WITHDRAW
     // =========================================
 
     @PostMapping("/{accountNumber}/withdraw")
-    @PreAuthorize("hasAnyRole('BANK_MANAGER', 'CUSTOMER')")
+    @PreAuthorize(
+            "hasAnyRole(" +
+                    "'BANK_MANAGER', " +
+                    "'CUSTOMER'" +
+                    ")"
+    )
     public ResponseEntity<Transaction> withdraw(
             @PathVariable String accountNumber,
             @Valid @RequestBody WithdrawRequest request) {
@@ -121,24 +191,57 @@ public class AccountController {
             @Valid @RequestBody TransferOtpRequest request,
             Authentication authentication) {
 
+        // =========================================
+        // FIND LOGGED-IN USER
+        // =========================================
+
         User user =
                 userRepository
-                        .findByUsername(authentication.getName())
+                        .findByUsername(
+                                authentication.getName()
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "User not found"
-                                ));
+                                )
+                        );
+
+
+        // =========================================
+        // FIND CUSTOMER
+        // =========================================
+
+        Customer customer =
+                customerRepository
+                        .findByUserUserId(
+                                user.getUserId()
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Customer not found"
+                                )
+                        );
+
+
+        // =========================================
+        // GENERATE TRANSFER OTP
+        // =========================================
 
         otpService.generateTransferOtp(
-                user,
+                customer,
                 request.toAccountNumber(),
                 request.amount()
         );
 
+
+        // =========================================
+        // RESPONSE
+        // =========================================
+
         return ResponseEntity.ok(
-                java.util.Map.of(
+                Map.of(
                         "message",
-                        "OTP generated successfully"
+                        "OTP sent successfully to your registered email"
                 )
         );
     }
@@ -152,21 +255,28 @@ public class AccountController {
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<Transaction> transferWithOtp(
             @PathVariable String accountNumber,
-            @RequestBody TransferConfirmRequest request,
+            @Valid @RequestBody TransferConfirmRequest request,
             Authentication authentication) {
+
+        // =========================================
+        // FIND LOGGED-IN USER
+        // =========================================
 
         User user =
                 userRepository
-                        .findByUsername(authentication.getName())
+                        .findByUsername(
+                                authentication.getName()
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "User not found"
-                                ));
+                                )
+                        );
 
-        // DEBUG - development only
-        System.out.println(
-                "CONTROLLER OTP = [" + request.otp() + "]"
-        );
+
+        // =========================================
+        // VERIFY OTP + TRANSFER
+        // =========================================
 
         Transaction transaction =
                 accountService.transferWithOtp(
@@ -175,6 +285,11 @@ public class AccountController {
                         request.description(),
                         user
                 );
+
+
+        // =========================================
+        // RESPONSE
+        // =========================================
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -188,7 +303,8 @@ public class AccountController {
 
     @GetMapping("/{accountNumber}/transactions")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<List<Transaction>> getTransactionHistory(
+    public ResponseEntity<List<Transaction>>
+    getTransactionHistory(
             @PathVariable String accountNumber) {
 
         return ResponseEntity.ok(
@@ -218,36 +334,5 @@ public class AccountController {
                 );
 
         return ResponseEntity.ok(statement);
-    }
-
-
-    @GetMapping("/{accountNumber}")
-    @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<Account> getAccount(
-            @PathVariable String accountNumber) {
-
-        Account account =
-                accountService.getAccountByNumber(accountNumber);
-
-        return ResponseEntity.ok(account);
-    }
-
-    // =========================================
-    // GET MY ACCOUNT
-    // =========================================
-
-    @GetMapping("/my-account")
-    @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<Account> getMyAccount(
-            Authentication authentication) {
-
-        String username =
-                authentication.getName();
-
-        return ResponseEntity.ok(
-                accountService.getCustomerAccount(
-                        username
-                )
-        );
     }
 }

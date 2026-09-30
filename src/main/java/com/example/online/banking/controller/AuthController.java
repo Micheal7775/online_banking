@@ -79,14 +79,12 @@ public class AuthController {
     public ResponseEntity<?> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
 
-        authService.forgotPassword(
-                request.username()
-        );
+        authService.forgotPassword(request.username());
 
         return ResponseEntity.ok(
                 Map.of(
                         "message",
-                        "Password reset OTP generated"
+                        "Password reset OTP sent to your registered email"
                 )
         );
     }

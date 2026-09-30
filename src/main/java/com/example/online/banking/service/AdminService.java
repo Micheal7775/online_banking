@@ -1,5 +1,7 @@
 package com.example.online.banking.service;
 
+import com.example.online.banking.ENum.CustomerStatus;
+import com.example.online.banking.ENum.EmployeeStatus;
 import com.example.online.banking.exception.ResourceNotFoundException;
 import com.example.online.banking.model.Branch;
 import com.example.online.banking.model.Customer;
@@ -123,21 +125,15 @@ public class AdminService {
     @Transactional
     public void deleteEmployee(Long employeeId) {
 
-        Employee employee =
-                employeeRepository.findById(employeeId)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Employee not found with id: "
-                                                + employeeId
-                                )
-                        );
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Employee not found")
+                );
 
-;
+        employee.setStatus(EmployeeStatus.INACTIVE);
 
-        employeeRepository.delete(employee);
+        employeeRepository.save(employee);
     }
-
-
     // =====================================================
     // CUSTOMER
     // =====================================================
@@ -367,17 +363,12 @@ public class AdminService {
 
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Customer not found"
-                        )
+                        new ResourceNotFoundException("Customer not found")
                 );
 
-        // Delete application records first
-        applicationRepository
-                .deleteByCustomerCustomerId(customerId);
+        customer.setStatus(CustomerStatus.INACTIVE);
 
-        // Then delete customer
-        customerRepository.delete(customer);
+        customerRepository.save(customer);
     }
     }
 

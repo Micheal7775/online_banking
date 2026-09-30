@@ -2,17 +2,20 @@ package com.example.online.banking.controller;
 
 import com.example.online.banking.dto.ApproveApplicationRequest;
 import com.example.online.banking.dto.VerifyApplicationRequest;
-import com.example.online.banking.model.Account;
 import com.example.online.banking.model.AccountOpeningApplication;
 import com.example.online.banking.service.ApplicationService;
+
 import jakarta.validation.Valid;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
 @RestController
 @RequestMapping("/api/verification/applications")
 @RequiredArgsConstructor
@@ -26,7 +29,7 @@ public class ApplicationController {
     // =====================================================
 
     @GetMapping
-    @PreAuthorize("hasRole('DOCUMENT_VERIFICATION_STAFF''DOCUMENT_VERIFICATION_STAFF')")
+    @PreAuthorize("hasRole('DOCUMENT_VERIFICATION_STAFF')")
     public ResponseEntity<List<AccountOpeningApplication>>
     getSubmittedApplications() {
 
@@ -36,25 +39,14 @@ public class ApplicationController {
     }
 
 
-    @GetMapping("/all")
-
-    public ResponseEntity<List<AccountOpeningApplication>> getAllApplication() {
-
-        return ResponseEntity.ok(
-                applicationService.getAllApplications()
-        );
-
-    }
-
-
-
-
     // =====================================================
     // DOCUMENT VERIFICATION STAFF - ALL
     // =====================================================
 
-    @GetMapping("/alls")
-    @PreAuthorize("hasRole('DOCUMENT_VERIFICATION_STAFF')")
+    @GetMapping("/all")
+    @PreAuthorize(
+            "hasAnyRole('DOCUMENT_VERIFICATION_STAFF', 'BANK_MANAGER')"
+    )
     public ResponseEntity<List<AccountOpeningApplication>>
     getAllApplications() {
 
@@ -68,8 +60,8 @@ public class ApplicationController {
     // ACCOUNT OPENING STAFF - ALL
     // =====================================================
 
-    @GetMapping("/staff/alls")
-    @PreAuthorize("hasRole('ACCOUNT_OPENING_STAFF','BANK_MANAGER',)")
+    @GetMapping("/staff/all")
+    @PreAuthorize("hasRole('ACCOUNT_OPENING_STAFF')")
     public ResponseEntity<List<AccountOpeningApplication>>
     getAllApplicationsForStaff() {
 
@@ -120,9 +112,8 @@ public class ApplicationController {
 
 
     // =====================================================
-    // BANK MANAGER - APPROVE
+    // BANK MANAGER - MANAGER VERIFY
     // =====================================================
-
 
     @PutMapping("/{applicationId}/manager-verify")
     @PreAuthorize("hasRole('BANK_MANAGER')")
@@ -143,6 +134,12 @@ public class ApplicationController {
 
         return ResponseEntity.ok(application);
     }
+
+
+    // =====================================================
+    // BANK MANAGER - APPROVE / REJECT
+    // =====================================================
+
     @PutMapping("/{applicationId}/approve")
     @PreAuthorize("hasRole('BANK_MANAGER')")
     public ResponseEntity<AccountOpeningApplication>

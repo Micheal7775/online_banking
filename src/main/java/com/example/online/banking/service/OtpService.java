@@ -3,8 +3,10 @@ package com.example.online.banking.service;
 import com.example.online.banking.ENum.OtpPurpose;
 import com.example.online.banking.ENum.OtpStatus;
 import com.example.online.banking.exception.ResourceNotFoundException;
+import com.example.online.banking.model.Customer;
 import com.example.online.banking.model.OTP;
 import com.example.online.banking.model.User;
+import com.example.online.banking.repo.CustomerRepository;
 import com.example.online.banking.repo.OTPRepository;
 import com.example.online.banking.repo.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,11 @@ public class OtpService {
 
     private final OTPRepository otpRepository;
 
+    private final EmailService emailService;
+
+    private final CustomerRepository customerRepository;
+
+
     private final SecureRandom secureRandom =
             new SecureRandom();
 
@@ -44,7 +51,7 @@ public class OtpService {
             );
         }
 
-        // Expire previous active OTPs
+        // Expire previous active OTP
         otpRepository
                 .findTopByUserUserIdAndStatusOrderByCreatedAtDesc(
                         user.getUserId(),
@@ -59,6 +66,10 @@ public class OtpService {
                     otpRepository.save(oldOtp);
                 });
 
+
+        // =========================================
+        // CREATE OTP
+        // =========================================
 
         OTP otp = new OTP();
 
@@ -89,14 +100,16 @@ public class OtpService {
         );
 
 
+        // =========================================
+        // SAVE OTP
+        // =========================================
+
         OTP savedOtp =
                 otpRepository.save(otp);
 
 
-        // Development testing only
         log.info(
-                "OTP generated: {} | User: {} | Purpose: {}",
-                otpCode,
+                "OTP generated for User: {} | Purpose: {}",
                 user.getUsername(),
                 purpose
         );
@@ -115,6 +128,14 @@ public class OtpService {
             User user,
             String otpCode) {
 
+        if (user == null) {
+
+            throw new IllegalArgumentException(
+                    "User is required"
+            );
+        }
+
+
         OTP otp = otpRepository
                 .findTopByUserUserIdAndStatusOrderByCreatedAtDesc(
                         user.getUserId(),
@@ -126,76 +147,144 @@ public class OtpService {
                         )
                 );
 
-        log.info(
-                "OTP DEBUG -> DB OTP: [{}], Entered OTP: [{}], Status: {}, Purpose: {}, Expires: {}, Attempts: {}",
-                otp.getOtpCode(),
-                otpCode,
-                otp.getStatus(),
-                otp.getPurpose(),
-                otp.getExpiresAt(),
-                otp.getAttempts()
-        );
 
-        if (LocalDateTime.now()
-                .isAfter(otp.getExpiresAt())) {
-
-            otp.setStatus(OtpStatus.EXPIRED);
-            otpRepository.save(otp);
-
-            log.warn("OTP expired");
-
-            return false;
-        }
-
-        if (otp.getAttempts() >= 3) {
-
-            otp.setStatus(OtpStatus.EXPIRED);
-            otpRepository.save(otp);
-
-            log.warn("OTP maximum attempts reached");
-
-            return false;
-        }
-
-        otp.setAttempts(
-                otp.getAttempts() + 1
-        );
+        // =========================================
+        // NULL / EMPTY OTP CHECK
+        // =========================================
 
         String enteredOtp =
                 otpCode == null
                         ? ""
                         : otpCode.trim();
 
-        if (!otp.getOtpCode().equals(enteredOtp)) {
+
+        // =========================================
+        // EXPIRY CHECK
+        // =========================================
+
+        if (otp.getExpiresAt() == null ||
+                LocalDateTime.now()
+                        .isAfter(otp.getExpiresAt())) {
+
+            otp.setStatus(
+                    OtpStatus.EXPIRED
+            );
 
             otpRepository.save(otp);
 
             log.warn(
-                    "OTP mismatch -> DB: [{}], Entered: [{}]",
-                    otp.getOtpCode(),
-                    enteredOtp
+                    "OTP expired for user: {}",
+                    user.getUsername()
             );
 
             return false;
         }
 
-        otp.setStatus(OtpStatus.USED);
+
+        // =========================================
+        // MAXIMUM ATTEMPTS CHECK
+        // =========================================
+
+        if (otp.getAttempts() >= 3) {
+
+            otp.setStatus(
+                    OtpStatus.EXPIRED
+            );
+
+            otpRepository.save(otp);
+
+            log.warn(
+                    "OTP maximum attempts reached for user: {}",
+                    user.getUsername()
+            );
+
+            return false;
+        }
+
+
+        // =========================================
+        // INCREMENT ATTEMPT
+        // =========================================
+
+        otp.setAttempts(
+                otp.getAttempts() + 1
+        );
+
+
+        // =========================================
+        // OTP MATCH CHECK
+        // =========================================
+
+        if (!otp.getOtpCode()
+                .equals(enteredOtp)) {
+
+            otpRepository.save(otp);
+
+            log.warn(
+                    "Invalid OTP entered for user: {}",
+                    user.getUsername()
+            );
+
+            return false;
+        }
+
+
+        // =========================================
+        // OTP SUCCESS
+        // =========================================
+
+        otp.setStatus(
+                OtpStatus.USED
+        );
 
         otpRepository.save(otp);
 
-        log.info("OTP VERIFIED SUCCESSFULLY");
+        log.info(
+                "OTP verified successfully for user: {}",
+                user.getUsername()
+        );
 
         return true;
     }
+
+
     // =========================================
     // GENERATE TRANSFER OTP
     // =========================================
 
     @Transactional
     public OTP generateTransferOtp(
-            User user,
+            Customer customer,
             String toAccountNumber,
             BigDecimal amount) {
+
+        // =========================================
+        // CUSTOMER CHECK
+        // =========================================
+
+        if (customer == null) {
+
+            throw new IllegalArgumentException(
+                    "Customer is required"
+            );
+        }
+
+
+        // =========================================
+        // USER CHECK
+        // =========================================
+
+        if (customer.getUser() == null) {
+
+            throw new IllegalStateException(
+                    "Customer user is not available"
+            );
+        }
+
+
+        // =========================================
+        // RECEIVER ACCOUNT CHECK
+        // =========================================
 
         if (toAccountNumber == null ||
                 toAccountNumber.isBlank()) {
@@ -205,6 +294,10 @@ public class OtpService {
             );
         }
 
+
+        // =========================================
+        // AMOUNT CHECK
+        // =========================================
 
         if (amount == null ||
                 amount.compareTo(
@@ -217,11 +310,32 @@ public class OtpService {
         }
 
 
+        // =========================================
+        // EMAIL CHECK
+        // =========================================
+
+        if (customer.getEmail() == null ||
+                customer.getEmail().isBlank()) {
+
+            throw new IllegalStateException(
+                    "Customer email address is not available"
+            );
+        }
+
+
+        // =========================================
+        // GENERATE OTP
+        // =========================================
+
         OTP otp = generateOtp(
-                user,
+                customer.getUser(),
                 OtpPurpose.MONEY_TRANSFER
         );
 
+
+        // =========================================
+        // SAVE TRANSFER DETAILS
+        // =========================================
 
         otp.setTransactionAmount(
                 amount
@@ -232,30 +346,89 @@ public class OtpService {
         );
 
 
-        return otpRepository.save(otp);
+        OTP savedOtp =
+                otpRepository.save(otp);
+
+
+        // =========================================
+        // SEND OTP TO CUSTOMER EMAIL
+        // =========================================
+
+        emailService.sendOtpEmail(
+                customer.getEmail(),
+                otp.getOtpCode()
+        );
+
+
+        log.info(
+                "Transfer OTP email sent to customer: {}",
+                customer.getCustomerNumber()
+        );
+
+
+        return savedOtp;
     }
 
 
     // =========================================
     // PASSWORD RESET OTP
     // =========================================
+// =========================================
+// PASSWORD RESET OTP
+// =========================================
 
     @Transactional
-    public OTP generatePasswordResetOtp(
-            String username) {
+    public OTP generatePasswordResetOtp(String username) {
 
+        // Find user
         User user = userRepository
                 .findByUsername(username)
                 .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found")
+                );
+
+        // Find customer linked with this user
+        Customer customer = customerRepository
+                .findByUserUsername(username)
+                .orElseThrow(() ->
                         new ResourceNotFoundException(
-                                "User not found"
+                                "Customer details not found"
                         )
                 );
 
 
-        return generateOtp(
+        if (customer == null) {
+            throw new ResourceNotFoundException(
+                    "Customer details not found for this user"
+            );
+        }
+
+        // Check customer email
+        if (customer.getEmail() == null ||
+                customer.getEmail().isBlank()) {
+
+            throw new IllegalStateException(
+                    "Customer email address is not available"
+            );
+        }
+
+        // Generate OTP
+        OTP otp = generateOtp(
                 user,
                 OtpPurpose.PASSWORD_RESET
         );
+
+        // Send OTP to customer email
+        emailService.sendOtpEmail(
+                customer.getEmail(),
+                otp.getOtpCode()
+        );
+
+        log.info(
+                "Password reset OTP email sent to customer: {}",
+                customer.getCustomerNumber()
+        );
+
+        return otp;
     }
 }

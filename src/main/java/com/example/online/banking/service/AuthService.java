@@ -5,12 +5,16 @@ import com.example.online.banking.dto.LoginRequest;
 import com.example.online.banking.dto.RegisterRequest;
 import com.example.online.banking.exception.DuplicateResourceException;
 import com.example.online.banking.exception.ResourceNotFoundException;
+import com.example.online.banking.model.Customer;
 import com.example.online.banking.model.User;
 import com.example.online.banking.repo.UserRepository;
 import com.example.online.banking.security.JwtService;
+
 import jakarta.transaction.Transactional;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,13 +35,17 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final LoginHistoryService loginHistoryService;
-
     private final OtpService otpService;
 
+
+    // =====================================================
+    // REGISTER
+    // =====================================================
 
     public User register(RegisterRequest request) {
 
         if (userRepository.existsByUsername(request.username())) {
+
             throw new DuplicateResourceException(
                     "Username already exists"
             );
@@ -48,7 +56,9 @@ public class AuthService {
         user.setUsername(request.username());
 
         user.setPassword(
-                passwordEncoder.encode(request.password())
+                passwordEncoder.encode(
+                        request.password()
+                )
         );
 
         user.setRole(request.role());
@@ -57,12 +67,21 @@ public class AuthService {
                 com.example.online.banking.ENum.UserStatus.ACTIVE
         );
 
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setCreatedAt(
+                LocalDateTime.now()
+        );
+
+        user.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         return userRepository.save(user);
     }
 
+
+    // =====================================================
+    // LOGIN
+    // =====================================================
 
     public Map<String, Object> login(
             LoginRequest request,
@@ -85,14 +104,18 @@ public class AuthService {
                             )
                     );
 
+
             User user =
                     userRepository
-                            .findByUsername(authentication.getName())
+                            .findByUsername(
+                                    authentication.getName()
+                            )
                             .orElseThrow(() ->
                                     new ResourceNotFoundException(
                                             "User not found"
                                     )
                             );
+
 
             String token =
                     jwtService.generateToken(
@@ -100,10 +123,17 @@ public class AuthService {
                             user.getRole().name()
                     );
 
-            user.setLastLogin(LocalDateTime.now());
-            user.setUpdatedAt(LocalDateTime.now());
+
+            user.setLastLogin(
+                    LocalDateTime.now()
+            );
+
+            user.setUpdatedAt(
+                    LocalDateTime.now()
+            );
 
             userRepository.save(user);
+
 
             loginHistoryService.recordLogin(
                     user,
@@ -111,10 +141,12 @@ public class AuthService {
                     deviceInfo
             );
 
+
             log.info("LOGIN SUCCESS");
             log.info("Username : {}", user.getUsername());
             log.info("Role     : {}", user.getRole());
             log.info("====================================");
+
 
             return Map.of(
                     "message", "Login successful",
@@ -122,6 +154,7 @@ public class AuthService {
                     "role", user.getRole().name(),
                     "token", token
             );
+
 
         } catch (BadCredentialsException e) {
 
@@ -135,6 +168,10 @@ public class AuthService {
         }
     }
 
+
+    // =====================================================
+    // CHANGE PASSWORD
+    // =====================================================
 
     @Transactional
     public void changePassword(
@@ -150,6 +187,7 @@ public class AuthService {
                                 )
                         );
 
+
         if (!passwordEncoder.matches(
                 request.currentPassword(),
                 user.getPassword())) {
@@ -158,6 +196,7 @@ public class AuthService {
                     "Current password is incorrect"
             );
         }
+
 
         if (passwordEncoder.matches(
                 request.newPassword(),
@@ -168,43 +207,44 @@ public class AuthService {
             );
         }
 
+
         user.setPassword(
                 passwordEncoder.encode(
                         request.newPassword()
                 )
         );
 
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         userRepository.save(user);
+
 
         log.info(
                 "Password changed successfully for user: {}",
                 username
         );
     }
+
+
+    // =====================================================
+    // FORGOT PASSWORD
+    // =====================================================
     @Transactional
     public void forgotPassword(String username) {
 
-        User user = userRepository
-                .findByUsername(username)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "User not found"
-                        )
-                );
-
-        otpService.generateOtp(
-                user,
-                com.example.online.banking.ENum.OtpPurpose.PASSWORD_RESET
-        );
+        otpService.generatePasswordResetOtp(username);
 
         log.info(
-                "Password reset OTP generated for user: {}",
+                "Password reset OTP sent to user email: {}",
                 username
         );
     }
 
+    // =====================================================
+    // RESET PASSWORD
+    // =====================================================
 
     @Transactional
     public void resetPassword(
@@ -212,30 +252,43 @@ public class AuthService {
             String otpCode,
             String newPassword) {
 
-        User user = userRepository
-                .findByUsername(username)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "User not found"
-                        )
-                );
+        User user =
+                userRepository
+                        .findByUsername(username)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "User not found"
+                                )
+                        );
+
 
         boolean verified =
-                otpService.verifyOtp(user, otpCode);
+                otpService.verifyOtp(
+                        user,
+                        otpCode
+                );
+
 
         if (!verified) {
+
             throw new IllegalStateException(
                     "Invalid or expired OTP"
             );
         }
 
+
         user.setPassword(
-                passwordEncoder.encode(newPassword)
+                passwordEncoder.encode(
+                        newPassword
+                )
         );
 
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(
+                LocalDateTime.now()
+        );
 
         userRepository.save(user);
+
 
         log.info(
                 "Password reset successfully for user: {}",

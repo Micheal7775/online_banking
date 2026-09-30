@@ -29,4 +29,5 @@ public interface CustomerRepository
     Optional<Customer> findByUserUsername(String username);
 
 
+    Optional<Customer> findByUserUserId(Long userId);
 }

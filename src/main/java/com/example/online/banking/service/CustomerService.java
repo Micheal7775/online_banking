@@ -292,6 +292,7 @@ public class CustomerService {
         return "CUS" + mobileNumber;
     }
 
+
     private String generateUniqueUsername() {
 
         String username;

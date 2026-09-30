@@ -4,6 +4,8 @@ import com.example.online.banking.ENum.Role;
 import com.example.online.banking.ENum.UserStatus;
 import com.example.online.banking.model.User;
 import com.example.online.banking.repo.UserRepository;
+import com.example.online.banking.service.EmailService;
+import com.example.online.banking.service.EmailTestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -19,6 +21,8 @@ public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailTestService emailTestService;
+
 
     @Override
     public void run(String... args) {
@@ -29,7 +33,6 @@ public class DataInitializer implements CommandLineRunner {
 
             return;
         }
-
         User admin = new User();
 
         admin.setUsername("admin");
