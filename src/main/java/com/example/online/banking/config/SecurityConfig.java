@@ -73,7 +73,7 @@ public class SecurityConfig {
                 List.of(
                         "http://localhost:5173",
                         "http://localhost:5056",
-                        "https://onlinebanking-frontend.onrender.com"
+                        "http://13.126.207.99"
                 )
         );
 
